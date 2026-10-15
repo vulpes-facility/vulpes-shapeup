@@ -1,6 +1,7 @@
 import { createPrivateKey } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { ShapeUpError } from 'gh-vulpes-shapeup/domain';
+import { parseCron } from './cron.mjs';
 
 const fail = message => { throw new ShapeUpError('settings', message); };
 
@@ -22,6 +23,12 @@ function port(env) {
   const text = (env.SHAPEUP_PORT ?? '').trim() || '8080';
   if (!/^[1-9][0-9]{0,4}$/.test(text) || Number(text) > 65_535) fail('SHAPEUP_PORT must be a port from 1 to 65535.');
   return Number(text);
+}
+
+function schedule(env, name, fallback) {
+  const text = (env[name] ?? '').trim() || fallback;
+  try { parseCron(text); } catch (error) { fail(`${name}: ${error.message}`); }
+  return text;
 }
 
 function apiUrl(env) {
@@ -47,8 +54,8 @@ export async function loadSettings(env = process.env) {
     privateKey,
     webhookSecret: await secret(env, 'SHAPEUP_WEBHOOK_SECRET_FILE'),
     databaseUrl,
-    rebuildSchedule: (env.SHAPEUP_REBUILD_SCHEDULE ?? '').trim() || '0 * * * *',
-    syncSchedule: (env.SHAPEUP_SYNC_SCHEDULE ?? '').trim() || '0 */4 * * *',
+    rebuildSchedule: schedule(env, 'SHAPEUP_REBUILD_SCHEDULE', '0 * * * *'),
+    syncSchedule: schedule(env, 'SHAPEUP_SYNC_SCHEDULE', '0 */4 * * *'),
     adminToken: await secret(env, 'SHAPEUP_ADMIN_TOKEN_FILE', { required: false }),
   };
 }

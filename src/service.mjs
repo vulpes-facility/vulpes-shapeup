@@ -105,6 +105,25 @@ export class HillService {
     await this.draw(pitch, scopes);
     return true;
   }
+  // Aligns every open pitch that has scopes, drawing only those the board no longer matches,
+  // so a scheduled run over many repositories commits nothing when nothing moved.
+  async alignAll() {
+    await this.initialize();
+    const failures = [];
+    let drawn = 0;
+    for (const pitch of await this.api.openPitches(this.config)) {
+      try {
+        requireType(pitch, 'pitch', this.config);
+        const scopes = await this.scopes(pitch);
+        if (scopes.length && await this.align(pitch, scopes)) drawn++;
+      } catch (error) {
+        failures.push({ number: pitch.number, code: error instanceof ShapeUpError ? error.code : 'unexpected' });
+      }
+    }
+    if (failures.length) throw new ShapeUpError('rebuild', `Some pitches were not aligned: ${failures.map(f => `#${f.number} (${f.code})`).join(', ')}.`);
+    return drawn;
+  }
+  // Draws every open pitch that has scopes, or one given pitch, whether or not it matches the board.
   async rebuild(input) {
     if (input !== '' && !/^[1-9][0-9]*$/.test(input)) throw new ShapeUpError('input', 'pitch_number must be a positive integer.');
     if (input && !Number.isSafeInteger(Number(input))) throw new ShapeUpError('input', 'pitch_number is too large.');

@@ -53,6 +53,8 @@ test('a missing or invalid setting stops the start, and no message repeats a sec
     [{ SHAPEUP_PORT: '65536' }, 'SHAPEUP_PORT must be a port from 1 to 65535.'],
     [{ SHAPEUP_GITHUB_API_URL: 'ftp://example.com' }, 'SHAPEUP_GITHUB_API_URL must be an http or https URL with no query.'],
     [{ SHAPEUP_GITHUB_API_URL: 'not a url' }, 'SHAPEUP_GITHUB_API_URL must be a URL.'],
+    [{ SHAPEUP_REBUILD_SCHEDULE: '@hourly' }, 'SHAPEUP_REBUILD_SCHEDULE: "@hourly" must have five fields: minute, hour, day of month, month, day of week.'],
+    [{ SHAPEUP_SYNC_SCHEDULE: '0 24 * * *' }, 'SHAPEUP_SYNC_SCHEDULE: The hour field "24" is outside 0-23.'],
   ]) {
     await assert.rejects(loadSettings(await environment(overrides)), error => {
       assert.equal(error.code, 'settings');

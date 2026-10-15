@@ -2,7 +2,7 @@
 
 vulpes-shapeup is the GitHub App server that draws Shape Up hill charts from the GitHub Project,\
 on the hill chart engine that gh-vulpes-shapeup handed over in its v2.\
-The engine, the settings, the App's authentication, the job queue and the webhook handler are here; the worker, the scheduler and the process that runs them are not built yet.
+The server runs, but no image is published, it has not run against GitHub yet, and the admin API is not built.
 
 ## Rules
 
@@ -17,11 +17,20 @@ The engine, the settings, the App's authentication, the job queue and the webhoo
   and only its `exports` (`config`, `domain`, `github`) MAY be imported.
 - Tests MUST NOT reach GitHub: every class takes its collaborators as arguments, and tests pass fakes.
 - The queue's SQL is tested against a real PostgreSQL in `test/db.test.mjs`, never a fake,\
-  and `SHAPEUP_TEST_DATABASE_URL` MUST name a throwaway database, since the tests empty it.
+  and `SHAPEUP_TEST_DATABASE_URL` MUST name a throwaway database, since the tests empty it.\
+  Test files MUST run one at a time (`npm test`), because two of them share that database.
+- Logs are JSON lines of codes, names and numbers; only a `ShapeUpError`'s message MAY be logged,\
+  and never a token, body, header value or secret.
 - A schema change is a new entry at the end of `migrations` in `src/db.mjs`; an applied migration is never edited.
 
 ## Index
 
+- `bin/server.mjs` - The process entry: starts the server and stops it on `SIGTERM` or `SIGINT`.
+- `src/main.mjs` - Wires every component into one process, heals at start, and stops after the job in hand.
+- `src/worker.mjs` - `Worker`, which runs one job at a time through the engine and retries transient failures with backoff.
+- `src/scheduler.mjs` - `Scheduler`, which starts the sync, rebuild and maintenance tasks on their cron minutes.
+- `src/cron.mjs` - The five-field numeric cron parser and matcher, in UTC.
+- `src/sync.mjs` - The installation sync and the scheduled rebuild's queuing.
 - `README.md` - What the server does, its components, events, configuration, the GitHub App it needs and the test commands.
 - `package.json` - The Node 24 requirement and the pinned gh-vulpes-shapeup dependency.
 - `src/settings.mjs` - Reads the README's environment variables and secret files, and refuses to start without them.

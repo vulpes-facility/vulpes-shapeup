@@ -179,6 +179,19 @@ test('redraw aligns only the pitch it is given, by its number or by one of its s
   assert.equal(await f.service.redraw(30, 'scope'), 'no-pitch');
   await assert.rejects(f.service.redraw(11, 'pitch'), { code: 'type' });
 });
+test('aligning every pitch draws only the open ones with scopes that the board no longer matches', async () => {
+  const f = fixture();
+  assert.equal(await f.service.alignAll(), 1);
+  assert.deepEqual(f.bodies.map(b => b.number), [10]);
+  assert.equal(await f.service.alignAll(), 0);
+  assert.equal(f.writes.length, 1);
+  f.values.set(11, 55);
+  assert.equal(await f.service.alignAll(), 1);
+  assert.equal(f.writes.length, 2);
+  f.open.push(40);
+  f.issues.get(40).labels = [{ name: 'scope' }];
+  await assert.rejects(f.service.alignAll(), { code: 'rebuild', message: 'Some pitches were not aligned: #40 (type).' });
+});
 test('manual rebuild draws open pitches that have scopes, or one given pitch', async () => {
   const f = fixture();
   assert.equal(await f.service.rebuild(''), 1);

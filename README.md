@@ -4,7 +4,7 @@ A GitHub App server that keeps each Shape Up pitch's hill chart in step with its
 Install the App on a repository, add `.github/shapeup.json`, and the charts follow the board,\
 with no workflow and no secret in the repository.
 
-> **Status: the hill chart engine, the settings, the App's authentication, the job queue and the webhook handler are here; the worker, the scheduler and the process that runs them are not built yet.**\
+> **Status: the server runs, but no image is published and it has not yet run against GitHub; the admin API is not built.**\
 > This README is the specification of the server.
 
 ## How it fits
@@ -43,7 +43,7 @@ All of them run in one process.
 
 | Component | Role |
 | --- | --- |
-| HTTP server | `POST /webhook` for GitHub, `GET /healthz`, and the admin API |
+| HTTP server | `POST /webhook` for GitHub and `GET /healthz`; an admin API is planned |
 | Webhook handler | Checks `X-Hub-Signature-256` over the raw body before parsing it, drops a repeated `X-GitHub-Delivery`, keeps only the events below and queues a job |
 | Job queue | Jobs in PostgreSQL. One pending job per repository and pitch; a worker takes one with `FOR UPDATE SKIP LOCKED`, and never two for the same repository at once |
 | Scheduler | Cron schedules for the rebuild and for the installation sync |
@@ -89,10 +89,12 @@ Secrets come from files, so that a deployment can mount them.
 | `SHAPEUP_WEBHOOK_SECRET_FILE` | | Path of the webhook secret |
 | `SHAPEUP_DATABASE_URL_FILE` | | Path of the PostgreSQL connection string |
 | `SHAPEUP_REBUILD_SCHEDULE` | `0 * * * *` | Cron schedule of the rebuild |
-| `SHAPEUP_SYNC_SCHEDULE` | `0 */4 * * *` | Cron schedule of the installation sync |
-| `SHAPEUP_ADMIN_TOKEN_FILE` | | Path of the admin API's bearer token; without it the admin API is off |
+| `SHAPEUP_SYNC_SCHEDULE` | `0 */4 * * *` | Cron schedule of the installation sync, which also prunes jobs older than 30 days |
+| `SHAPEUP_ADMIN_TOKEN_FILE` | | Path of the admin API's bearer token, read for the admin API that is not built yet |
 
-The server does not start when a required variable or file is missing or invalid.
+The server does not start when a required variable or file is missing or invalid.\
+A schedule has five numeric fields in UTC: minute, hour, day of month, month and day of week,\
+each `*`, a number, a range, a step or a list of those; names and `@` macros are not taken.
 
 ## GitHub App
 
@@ -115,7 +117,17 @@ the server still narrows its own tokens to read.
 
 The server needs PostgreSQL, the App's private key and webhook secret as files,\
 and a public HTTPS address that routes `/webhook` to it.\
-Keep the admin API off the internet: its answers name private repositories.
+Keep the admin API off the internet once it exists: its answers name private repositories.
+
+```sh
+npm ci --omit=dev
+npm start   # node bin/server.mjs
+```
+
+At start the server migrates the database, syncs the installations and queues a rebuild of every repository,\
+so whatever happened while it was down is healed.\
+It logs one JSON line per event to stdout, with codes, names and numbers only.\
+On `SIGTERM` or `SIGINT` it stops taking webhooks, finishes the job in hand and exits.
 
 A container image will be published on GitHub Container Registry for each release.
 
@@ -129,17 +141,17 @@ each organization keeps those with its own deployment.
 
 ```sh
 npm ci                                                       # gh-vulpes-shapeup, pinned in package.json
-node --test "test/*.test.mjs"                                # every unit test (the same as npm test)
+npm test                                                     # every test, one file at a time
 node test/render-fixtures.mjs | python3 test/validate-svg.py  # parse the rendered SVGs with a real XML parser
 ```
 
-The queue's tests in `test/db.test.mjs` run only when `SHAPEUP_TEST_DATABASE_URL` names a throwaway database,\
+The tests in `test/db.test.mjs` and `test/main.test.mjs` run only when `SHAPEUP_TEST_DATABASE_URL` names a throwaway database,\
 which they empty first; CI gives them one.\
 Locally, a container serves:
 
 ```sh
 docker run -d --rm --name shapeup-test-pg -e POSTGRES_PASSWORD=test -e POSTGRES_DB=shapeup_test -p 127.0.0.1:55432:5432 postgres:17-alpine
-SHAPEUP_TEST_DATABASE_URL=postgres://postgres:test@127.0.0.1:55432/shapeup_test node --test "test/*.test.mjs"
+SHAPEUP_TEST_DATABASE_URL=postgres://postgres:test@127.0.0.1:55432/shapeup_test npm test
 ```
 
 The hill chart engine came from gh-vulpes-shapeup v2:\
