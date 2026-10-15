@@ -26,6 +26,24 @@ export class Registry {
       client.release();
     }
   }
+  // Records an installation that a webhook names, and keeps the repositories already known for it.
+  async upsertInstallation({ id, account, suspended }) {
+    await this.pool.query(
+      `INSERT INTO installation (id, account, suspended) VALUES ($1, $2, $3)
+       ON CONFLICT (id) DO UPDATE SET account = excluded.account, suspended = excluded.suspended`,
+      [id, account, suspended]);
+  }
+  // Adds repositories to an installation and returns the ones that are new.
+  async addRepositories(installationId, names) {
+    const { rows } = await this.pool.query(
+      `INSERT INTO repository (full_name, installation_id) SELECT unnest($2::text[]), $1
+       ON CONFLICT (full_name) DO UPDATE SET installation_id = excluded.installation_id
+       RETURNING full_name, (xmax = 0) AS added`, [installationId, names]);
+    return rows.filter(row => row.added).map(row => row.full_name);
+  }
+  async removeRepositories(names) {
+    await this.pool.query('DELETE FROM repository WHERE full_name = ANY($1)', [names]);
+  }
   // An installation GitHub no longer lists is gone, with its repositories.
   async removeInstallationsExcept(ids) {
     const { rowCount } = await this.pool.query('DELETE FROM installation WHERE NOT (id = ANY($1::bigint[]))', [ids]);

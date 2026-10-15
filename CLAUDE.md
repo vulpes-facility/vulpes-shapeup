@@ -2,7 +2,7 @@
 
 vulpes-shapeup is the GitHub App server that draws Shape Up hill charts from the GitHub Project,\
 on the hill chart engine that gh-vulpes-shapeup handed over in its v2.\
-The engine, the settings, the App's authentication and the job queue are here; the webhook handler and the worker are not built yet.
+The engine, the settings, the App's authentication, the job queue and the webhook handler are here; the worker, the scheduler and the process that runs them are not built yet.
 
 ## Rules
 
@@ -27,6 +27,9 @@ The engine, the settings, the App's authentication and the job queue are here; t
 - `src/settings.mjs` - Reads the README's environment variables and secret files, and refuses to start without them.
 - `src/app-auth.mjs` - The App's JWT, and installation tokens narrowed to one repository and the job's permissions.
 - `src/repository-config.mjs` - Reads `.github/shapeup.json` from a repository's default branch, or says why it is skipped.
+- `src/http.mjs` - The HTTP server: `POST /webhook` with a body limit and `GET /healthz`; it logs no body, header value or token.
+- `src/webhook.mjs` - The signature check and `WebhookHandler`, which turns issue, comment, board and installation events into jobs and registry changes.
+- `src/project-items.mjs` - Finds the issue and repository behind a `projects_v2_item` event through GraphQL.
 - `src/db.mjs` - The PostgreSQL pool and the migrations: installations, repositories, jobs and deliveries.
 - `src/queue.mjs` - `Queue`, which coalesces, prioritizes and claims jobs one repository at a time, and `Deliveries`, which drops repeated webhooks.
 - `src/registry.mjs` - `Registry`, the installations and repositories the App reaches and each repository's last result.
