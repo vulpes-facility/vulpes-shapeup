@@ -46,8 +46,16 @@ export const migrations = [
 // Every bigint here is an id well below 2^53, so it is read as a number rather than a string.
 pg.types.setTypeParser(pg.types.builtins.INT8, value => Number(value));
 
-export function createPool(databaseUrl) {
-  return new pg.Pool({ connectionString: databaseUrl, max: 5 });
+// pg lets the connection string override a separate password, so a password from its own file is put into the string,
+// in memory only.
+export function createPool(databaseUrl, password = null) {
+  let connectionString = databaseUrl;
+  if (password !== null) {
+    const url = new URL(databaseUrl);
+    url.password = encodeURIComponent(password);
+    connectionString = url.toString();
+  }
+  return new pg.Pool({ connectionString, max: 5 });
 }
 
 // A transaction-scoped advisory lock lets one server migrate while another waits for it.

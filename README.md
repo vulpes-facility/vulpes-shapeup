@@ -87,7 +87,9 @@ Secrets come from files, so that a deployment can mount them.
 | `SHAPEUP_APP_CLIENT_ID` | | The App's Client ID, the issuer of its JWT |
 | `SHAPEUP_APP_PRIVATE_KEY_FILE` | | Path of the App's private key (PEM) |
 | `SHAPEUP_WEBHOOK_SECRET_FILE` | | Path of the webhook secret |
-| `SHAPEUP_DATABASE_URL_FILE` | | Path of the PostgreSQL connection string |
+| `SHAPEUP_DATABASE_URL_FILE` | | Path of the PostgreSQL connection string, password included; or use the next two |
+| `SHAPEUP_DATABASE_URL` | | The connection string without a password, which it must not hold |
+| `SHAPEUP_DATABASE_PASSWORD_FILE` | | Path of the database password, with `SHAPEUP_DATABASE_URL`; the same file can serve PostgreSQL's `POSTGRES_PASSWORD_FILE` |
 | `SHAPEUP_REBUILD_SCHEDULE` | `0 * * * *` | Cron schedule of the rebuild |
 | `SHAPEUP_SYNC_SCHEDULE` | `0 */4 * * *` | Cron schedule of the installation sync, which also prunes jobs older than 30 days |
 | `SHAPEUP_ADMIN_TOKEN_FILE` | | Path of the admin API's bearer token, read for the admin API that is not built yet |
@@ -141,9 +143,22 @@ docker run -p 8080:8080 -v /path/to/secrets:/run/secrets/shapeup:ro \
   ghcr.io/vulpes-facility/vulpes-shapeup:<version>
 ```
 
-The image runs as the `node` user on `linux/amd64`.\
+The image runs as the `node` user on `linux/amd64` and writes nothing to its filesystem.\
 GitHub creates the package private on its first push;\
 an organization that wants pulls without credentials makes it public in the package settings.
+
+### Resources and probes
+
+| | CPU request / limit | Memory request / limit | Volume |
+| --- | --- | --- | --- |
+| Server | 50m / 500m | 128Mi / 256Mi | None |
+| PostgreSQL | 100m / 500m | 256Mi / 512Mi | 1 GiB |
+
+These are starting figures for one organization; adjust them to what the first weeks use.\
+Both probes can use `GET /healthz` on port 8080.\
+Run one replica: the queue is safe with more, but every replica would also run the scheduler.\
+Webhooks that arrive while the server is down are not redelivered by GitHub;\
+the rebuild that runs at every start, and the scheduled one, align every chart again.
 
 ## Releases
 

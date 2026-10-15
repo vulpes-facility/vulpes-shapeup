@@ -21,7 +21,7 @@ export const jsonLog = entry => console.log(JSON.stringify({ time: new Date().to
 // Starts every component in one process, and returns a stop that finishes the job in hand.
 export async function start(env = process.env, { log = jsonLog, fetchImpl = fetch } = {}) {
   const settings = await loadSettings(env);
-  const pool = createPool(settings.databaseUrl);
+  const pool = createPool(settings.databaseUrl, settings.databasePassword);
   await migrate(pool);
   const queue = new Queue(pool);
   const registry = new Registry(pool);
