@@ -2,7 +2,7 @@
 
 vulpes-shapeup is the GitHub App server that draws Shape Up hill charts from the GitHub Project,\
 on the hill chart engine that gh-vulpes-shapeup handed over in its v2.\
-The engine, the settings and the App's authentication are here; the webhook handler, queue and worker are not built yet.
+The engine, the settings, the App's authentication and the job queue are here; the webhook handler and the worker are not built yet.
 
 ## Rules
 
@@ -16,6 +16,9 @@ The engine, the settings and the App's authentication are here; the webhook hand
 - gh-vulpes-shapeup MUST be pinned in `package.json` to a commit or a version tag, never to a branch,\
   and only its `exports` (`config`, `domain`, `github`) MAY be imported.
 - Tests MUST NOT reach GitHub: every class takes its collaborators as arguments, and tests pass fakes.
+- The queue's SQL is tested against a real PostgreSQL in `test/db.test.mjs`, never a fake,\
+  and `SHAPEUP_TEST_DATABASE_URL` MUST name a throwaway database, since the tests empty it.
+- A schema change is a new entry at the end of `migrations` in `src/db.mjs`; an applied migration is never edited.
 
 ## Index
 
@@ -24,6 +27,9 @@ The engine, the settings and the App's authentication are here; the webhook hand
 - `src/settings.mjs` - Reads the README's environment variables and secret files, and refuses to start without them.
 - `src/app-auth.mjs` - The App's JWT, and installation tokens narrowed to one repository and the job's permissions.
 - `src/repository-config.mjs` - Reads `.github/shapeup.json` from a repository's default branch, or says why it is skipped.
+- `src/db.mjs` - The PostgreSQL pool and the migrations: installations, repositories, jobs and deliveries.
+- `src/queue.mjs` - `Queue`, which coalesces, prioritizes and claims jobs one repository at a time, and `Deliveries`, which drops repeated webhooks.
+- `src/registry.mjs` - `Registry`, the installations and repositories the App reaches and each repository's last result.
 - `src/service.mjs` - `HillService`, which aligns the hill chart of a pitch with its scopes' positions.
 - `src/store.mjs` - `GeneratedStore`, which commits the charts to the orphan `generated/` branch through the Git Data API.
 - `src/render.mjs` - The SVG renderer, the chart link and the check that an issue is a scope or a pitch.

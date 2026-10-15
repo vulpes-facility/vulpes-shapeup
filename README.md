@@ -4,7 +4,7 @@ A GitHub App server that keeps each Shape Up pitch's hill chart in step with its
 Install the App on a repository, add `.github/shapeup.json`, and the charts follow the board,\
 with no workflow and no secret in the repository.
 
-> **Status: the hill chart engine, the settings and the App's authentication are here; the webhook handler, queue and worker are not built yet.**\
+> **Status: the hill chart engine, the settings, the App's authentication and the job queue are here; the webhook handler and the worker are not built yet.**\
 > This README is the specification of the server.
 
 ## How it fits
@@ -131,6 +131,15 @@ each organization keeps those with its own deployment.
 npm ci                                                       # gh-vulpes-shapeup, pinned in package.json
 node --test "test/*.test.mjs"                                # every unit test (the same as npm test)
 node test/render-fixtures.mjs | python3 test/validate-svg.py  # parse the rendered SVGs with a real XML parser
+```
+
+The queue's tests in `test/db.test.mjs` run only when `SHAPEUP_TEST_DATABASE_URL` names a throwaway database,\
+which they empty first; CI gives them one.\
+Locally, a container serves:
+
+```sh
+docker run -d --rm --name shapeup-test-pg -e POSTGRES_PASSWORD=test -e POSTGRES_DB=shapeup_test -p 127.0.0.1:55432:5432 postgres:17-alpine
+SHAPEUP_TEST_DATABASE_URL=postgres://postgres:test@127.0.0.1:55432/shapeup_test node --test "test/*.test.mjs"
 ```
 
 The hill chart engine came from gh-vulpes-shapeup v2:\
