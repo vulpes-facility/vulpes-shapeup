@@ -108,6 +108,7 @@ Create an App in the organization that owns the project, with these settings:
 | Organization permissions | Projects: read-only |
 | Events | Issues, Issue comment, Projects v2 item |
 | Where it can be installed | Only on this account |
+| Logo | [`assets/icon-512.png`](assets/icon-512.png), under GitHub's 1 MB limit |
 
 Install it on the repositories that use Shape Up, never on all of them.\
 If the same App also serves the board Action, which changes the project, give it Projects: read and write;\

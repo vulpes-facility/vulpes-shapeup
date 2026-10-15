@@ -50,5 +50,6 @@ The server runs and ships as an image, but it has not run against GitHub yet, an
 - `.github/workflows/release.yml` - Builds the image on a `vX.Y.Z` tag and pushes it to GitHub Container Registry.
 - `Dockerfile` - The production image: Node 24 on Alpine, pinned by digest, production dependencies only, run as `node`.
 - `.dockerignore` - Lets only `package.json`, the lockfile, `bin/` and `src/` into the image.
+- `assets/` - The App's icon: `icon.png` at full size and `icon-512.png` for the GitHub App logo.
 - `LICENSE` - The MIT License.
 - `.gitattributes` - LF line endings for every text file.
