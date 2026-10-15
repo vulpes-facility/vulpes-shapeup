@@ -4,7 +4,7 @@ A GitHub App server that keeps each Shape Up pitch's hill chart in step with its
 Install the App on a repository, add `.github/shapeup.json`, and the charts follow the board,\
 with no workflow and no secret in the repository.
 
-> **Status: the server runs, but no image is published and it has not yet run against GitHub; the admin API is not built.**\
+> **Status: the server runs and ships as an image, but it has not yet run against GitHub; the admin API is not built.**\
 > This README is the specification of the server.
 
 ## How it fits
@@ -129,7 +129,25 @@ so whatever happened while it was down is healed.\
 It logs one JSON line per event to stdout, with codes, names and numbers only.\
 On `SIGTERM` or `SIGINT` it stops taking webhooks, finishes the job in hand and exits.
 
-A container image will be published on GitHub Container Registry for each release.
+Or run the image, with the secrets mounted as files:
+
+```sh
+docker run -p 8080:8080 -v /path/to/secrets:/run/secrets/shapeup:ro \
+  -e SHAPEUP_APP_CLIENT_ID=<client id> \
+  -e SHAPEUP_APP_PRIVATE_KEY_FILE=/run/secrets/shapeup/key.pem \
+  -e SHAPEUP_WEBHOOK_SECRET_FILE=/run/secrets/shapeup/webhook-secret \
+  -e SHAPEUP_DATABASE_URL_FILE=/run/secrets/shapeup/database-url \
+  ghcr.io/vulpes-facility/vulpes-shapeup:<version>
+```
+
+The image runs as the `node` user on `linux/amd64`.
+
+## Releases
+
+Pushing a `vX.Y.Z` tag on a commit of `main` runs `.github/workflows/release.yml`,\
+which builds the image and pushes it as `ghcr.io/vulpes-facility/vulpes-shapeup:X.Y.Z` and `X.Y`.\
+The tag's version matches `version` in `package.json`.\
+This repository only publishes images; each organization deploys them on its own.
 
 ## What does not live here
 
