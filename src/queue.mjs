@@ -97,6 +97,10 @@ export class Deliveries {
     const { rowCount } = await this.pool.query('INSERT INTO delivery (id) VALUES ($1) ON CONFLICT DO NOTHING', [id]);
     return rowCount === 1;
   }
+  // A delivery that failed half-way is forgotten, so that GitHub's redelivery is acted on.
+  async forget(id) {
+    await this.pool.query('DELETE FROM delivery WHERE id = $1', [id]);
+  }
   async prune(olderThanMs) {
     const { rowCount } = await this.pool.query('DELETE FROM delivery WHERE received_at < now() - make_interval(secs => $1)', [olderThanMs / 1000]);
     return rowCount;

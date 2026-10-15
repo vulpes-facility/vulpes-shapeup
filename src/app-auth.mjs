@@ -38,12 +38,13 @@ export class AppAuth {
       if (batch.length < 100) return all;
     }
   }
-  // A token narrowed to one repository, or to the installation's metadata when no repository is named.
-  async token(installationId, repository = null) {
-    const key = `${installationId}/${repository ?? ''}`;
+  // A token narrowed to one repository with the job's permissions; without a repository, one for the whole installation
+  // with the permissions given, the installation's metadata by default.
+  async token(installationId, repository = null, permissions = { metadata: 'read' }) {
+    const key = `${installationId}/${repository ?? JSON.stringify(permissions)}`;
     const cached = this.tokens.get(key);
     if (cached && cached.expires - this.now() > margin) return cached.token;
-    const body = repository ? { repositories: [repository.split('/')[1]], permissions: jobPermissions } : { permissions: { metadata: 'read' } };
+    const body = repository ? { repositories: [repository.split('/')[1]], permissions: jobPermissions } : { permissions };
     const result = await this.request(`/app/installations/${installationId}/access_tokens`, { method: 'POST', body });
     this.tokens.set(key, { token: result.token, expires: Date.parse(result.expires_at) });
     return result.token;

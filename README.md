@@ -4,7 +4,7 @@ A GitHub App server that keeps each Shape Up pitch's hill chart in step with its
 Install the App on a repository, add `.github/shapeup.json`, and the charts follow the board,\
 with no workflow and no secret in the repository.
 
-> **Status: the hill chart engine, the settings, the App's authentication and the job queue are here; the webhook handler and the worker are not built yet.**\
+> **Status: the hill chart engine, the settings, the App's authentication, the job queue and the webhook handler are here; the worker, the scheduler and the process that runs them are not built yet.**\
 > This README is the specification of the server.
 
 ## How it fits
@@ -67,7 +67,7 @@ losing it costs one installation sync and one rebuild.
 
 | Event | Actions | Queues |
 | --- | --- | --- |
-| `projects_v2_item` | `edited`, when the field is the config's Hill Position | The item's scope's pitch |
+| `projects_v2_item` | `edited`, on an item that is an issue, found through GraphQL | The issue, when it is a scope; the chart changes only if the board no longer matches it |
 | `issues` | `opened`, `closed`, `reopened`, on an issue with the scope label | The scope's pitch |
 | `issue_comment` | `created` by a person on an issue with the scope label | The scope's pitch |
 | `installation`, `installation_repositories` | Created, added, removed, suspended | A sync, and a rebuild of each new repository |

@@ -126,3 +126,18 @@ test('the registry follows each installation\'s repositories and leaves suspende
   assert.equal(await registry.removeInstallationsExcept([1]), 1);
   assert.equal(await registry.repository('other/x'), null);
 });
+
+test('webhooks add and remove repositories one by one, and a forgotten delivery can be acted on again', { skip }, async () => {
+  const { registry, deliveries } = await fresh();
+  await registry.upsertInstallation({ id: 3, account: 'acme', suspended: false });
+  assert.deepEqual(await registry.addRepositories(3, ['acme/a', 'acme/b']), ['acme/a', 'acme/b']);
+  assert.deepEqual(await registry.addRepositories(3, ['acme/b', 'acme/c']), ['acme/c']);
+  await registry.removeRepositories(['acme/a']);
+  await registry.upsertInstallation({ id: 3, account: 'acme', suspended: true });
+  assert.deepEqual(await registry.repository('acme/b'), { fullName: 'acme/b', installationId: 3, suspended: true });
+  assert.deepEqual(await registry.active(), []);
+  assert.equal(await registry.repository('acme/a'), null);
+  assert.equal(await deliveries.first('d-9'), true);
+  await deliveries.forget('d-9');
+  assert.equal(await deliveries.first('d-9'), true);
+});
