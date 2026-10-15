@@ -140,12 +140,14 @@ docker run -p 8080:8080 -v /path/to/secrets:/run/secrets/shapeup:ro \
   ghcr.io/vulpes-facility/vulpes-shapeup:<version>
 ```
 
-The image runs as the `node` user on `linux/amd64`.
+The image runs as the `node` user on `linux/amd64`.\
+GitHub creates the package private on its first push;\
+an organization that wants pulls without credentials makes it public in the package settings.
 
 ## Releases
 
 Pushing a `vX.Y.Z` tag on a commit of `main` runs `.github/workflows/release.yml`,\
-which builds the image and pushes it as `ghcr.io/vulpes-facility/vulpes-shapeup:X.Y.Z` and `X.Y`.\
+which builds the image and pushes it as `ghcr.io/vulpes-facility/vulpes-shapeup:X.Y.Z`, `X.Y` and `latest`.\
 The tag's version matches `version` in `package.json`.\
 This repository only publishes images; each organization deploys them on its own.
 
