@@ -4,8 +4,8 @@ A GitHub App server that keeps each Shape Up pitch's hill chart in step with its
 Install the App on a repository, add `.github/shapeup.json`, and the charts follow the board,\
 with no workflow and no secret in the repository.
 
-> **Status: design.**\
-> This README is the specification; the code arrives once [gh-vulpes-shapeup](https://github.com/vulpes-facility/gh-vulpes-shapeup) v2 hands over its hill chart engine.
+> **Status: the hill chart engine is here; the server is not built yet.**\
+> This README is the specification of the server.
 
 ## How it fits
 
@@ -124,6 +124,18 @@ A container image will be published on GitHub Container Registry for each releas
 This repository holds code and documentation only.\
 No private key, webhook secret, database credential, deployment manifest or organization's setting is ever committed here;\
 each organization keeps those with its own deployment.
+
+## Development
+
+```sh
+npm ci                                                       # gh-vulpes-shapeup, pinned in package.json
+node --test "test/*.test.mjs"                                # every unit test (the same as npm test)
+node test/render-fixtures.mjs | python3 test/validate-svg.py  # parse the rendered SVGs with a real XML parser
+```
+
+The hill chart engine came from gh-vulpes-shapeup v2:\
+`src/service.mjs` (`HillService`), `src/store.mjs` (`GeneratedStore`) and `src/render.mjs` (the SVG renderer).\
+It imports the config, the hill block and the `GitHub` transport from gh-vulpes-shapeup's `exports`.
 
 ## License
 
