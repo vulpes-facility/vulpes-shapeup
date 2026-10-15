@@ -21,6 +21,18 @@ const states = async () => (await pool.query('SELECT repository, kind, number, s
 test.before(() => { if (url) pool = createPool(url); });
 test.after(async () => { await pool?.end(); });
 
+test('the password may come apart from the connection string', { skip }, async () => {
+  const parts = new URL(url);
+  const password = decodeURIComponent(parts.password);
+  parts.password = '';
+  const apart = createPool(parts.toString(), password);
+  try {
+    assert.equal((await apart.query('SELECT 1 AS one')).rows[0].one, 1);
+  } finally {
+    await apart.end();
+  }
+});
+
 test('migrations run once, in order, and a second run applies none', { skip }, async () => {
   await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
   assert.equal(await migrate(pool), migrations.length);

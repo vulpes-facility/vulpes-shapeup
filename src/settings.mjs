@@ -31,6 +31,26 @@ function schedule(env, name, fallback) {
   return text;
 }
 
+// The database comes either as one connection string in a file, or as a string without its password
+// and the password in a file of its own, so that PostgreSQL and the server share one secret value.
+async function database(env) {
+  const inline = (env.SHAPEUP_DATABASE_URL ?? '').trim();
+  const hasFile = Boolean((env.SHAPEUP_DATABASE_URL_FILE ?? '').trim());
+  if (inline && hasFile) fail('Set SHAPEUP_DATABASE_URL or SHAPEUP_DATABASE_URL_FILE, not both.');
+  if (!inline) {
+    if (env.SHAPEUP_DATABASE_PASSWORD_FILE?.trim()) fail('SHAPEUP_DATABASE_PASSWORD_FILE goes with SHAPEUP_DATABASE_URL, not with SHAPEUP_DATABASE_URL_FILE.');
+    const url = await secret(env, 'SHAPEUP_DATABASE_URL_FILE');
+    if (!/^postgres(ql)?:\/\//.test(url)) fail('SHAPEUP_DATABASE_URL_FILE must hold a postgres:// connection string.');
+    return { databaseUrl: url, databasePassword: null };
+  }
+  let url;
+  try { url = new URL(inline); } catch { fail('SHAPEUP_DATABASE_URL must be a postgres:// connection string.'); }
+  if (!['postgres:', 'postgresql:'].includes(url.protocol)) fail('SHAPEUP_DATABASE_URL must be a postgres:// connection string.');
+  // The variable is not a secret, so it MUST NOT carry one.
+  if (url.password) fail('SHAPEUP_DATABASE_URL must not hold a password; put it in SHAPEUP_DATABASE_PASSWORD_FILE.');
+  return { databaseUrl: inline, databasePassword: await secret(env, 'SHAPEUP_DATABASE_PASSWORD_FILE', { required: false }) };
+}
+
 function apiUrl(env) {
   const text = (env.SHAPEUP_GITHUB_API_URL ?? '').trim() || 'https://api.github.com';
   let url;
@@ -45,8 +65,7 @@ export async function loadSettings(env = process.env) {
   if (!clientId) fail('SHAPEUP_APP_CLIENT_ID must hold the App\'s Client ID.');
   const privateKey = await secret(env, 'SHAPEUP_APP_PRIVATE_KEY_FILE');
   try { createPrivateKey(privateKey); } catch { fail('SHAPEUP_APP_PRIVATE_KEY_FILE does not hold a PEM private key.'); }
-  const databaseUrl = await secret(env, 'SHAPEUP_DATABASE_URL_FILE');
-  if (!/^postgres(ql)?:\/\//.test(databaseUrl)) fail('SHAPEUP_DATABASE_URL_FILE must hold a postgres:// connection string.');
+  const { databaseUrl, databasePassword } = await database(env);
   return {
     port: port(env),
     apiUrl: apiUrl(env),
@@ -54,6 +73,7 @@ export async function loadSettings(env = process.env) {
     privateKey,
     webhookSecret: await secret(env, 'SHAPEUP_WEBHOOK_SECRET_FILE'),
     databaseUrl,
+    databasePassword,
     rebuildSchedule: schedule(env, 'SHAPEUP_REBUILD_SCHEDULE', '0 * * * *'),
     syncSchedule: schedule(env, 'SHAPEUP_SYNC_SCHEDULE', '0 */4 * * *'),
     adminToken: await secret(env, 'SHAPEUP_ADMIN_TOKEN_FILE', { required: false }),
