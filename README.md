@@ -4,7 +4,7 @@ A GitHub App server that keeps each Shape Up pitch's hill chart in step with its
 Install the App on a repository, add `.github/shapeup.json`, and the charts follow the board,\
 with no workflow and no secret in the repository.
 
-> **Status: the hill chart engine is here; the server is not built yet.**\
+> **Status: the hill chart engine, the settings and the App's authentication are here; the webhook handler, queue and worker are not built yet.**\
 > This README is the specification of the server.
 
 ## How it fits
