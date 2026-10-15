@@ -2,7 +2,7 @@
 
 vulpes-shapeup is the GitHub App server that draws Shape Up hill charts from the GitHub Project,\
 on the hill chart engine that gh-vulpes-shapeup handed over in its v2.\
-The server runs, but no image is published, it has not run against GitHub yet, and the admin API is not built.
+The server runs and ships as an image, but it has not run against GitHub yet, and the admin API is not built.
 
 ## Rules
 
@@ -46,6 +46,9 @@ The server runs, but no image is published, it has not run against GitHub yet, a
 - `src/store.mjs` - `GeneratedStore`, which commits the charts to the orphan `generated/` branch through the Git Data API.
 - `src/render.mjs` - The SVG renderer, the chart link and the check that an issue is a scope or a pitch.
 - `test/` - Unit tests on fakes, the SVG fixtures and `validate-svg.py`, which parses them in CI.
-- `.github/workflows/test.yml` - CI for the unit tests and the SVG check.
+- `.github/workflows/test.yml` - CI for the unit tests, with a throwaway PostgreSQL, and the SVG check.
+- `.github/workflows/release.yml` - Builds the image on a `vX.Y.Z` tag and pushes it to GitHub Container Registry.
+- `Dockerfile` - The production image: Node 24 on Alpine, pinned by digest, production dependencies only, run as `node`.
+- `.dockerignore` - Lets only `package.json`, the lockfile, `bin/` and `src/` into the image.
 - `LICENSE` - The MIT License.
 - `.gitattributes` - LF line endings for every text file.
