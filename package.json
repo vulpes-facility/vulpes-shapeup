@@ -1,6 +1,6 @@
 {
   "name": "vulpes-shapeup",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "GitHub App server that keeps Shape Up hill charts in step with the GitHub Project.",
   "license": "MIT",
