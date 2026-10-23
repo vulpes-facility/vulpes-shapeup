@@ -2,7 +2,7 @@
 
 vulpes-shapeup is the GitHub App server that draws Shape Up hill charts from the GitHub Project,\
 on the hill chart engine that gh-vulpes-shapeup handed over in its v2.\
-The server runs and ships as an image, but it has not run against GitHub yet, and the admin API is not built.
+The server runs against GitHub from 0.2.0 on, and the admin API is not built.
 
 ## Rules
 
