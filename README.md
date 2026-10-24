@@ -127,7 +127,9 @@ npm ci --omit=dev
 npm start   # node bin/server.mjs
 ```
 
-At start the server migrates the database, syncs the installations and queues a rebuild of every repository,\
+At start the server waits about two minutes for PostgreSQL, which may still be starting beside it,\
+and fails at once when PostgreSQL refuses it, as for a wrong password or a missing database.\
+It then migrates the database, syncs the installations and queues a rebuild of every repository,\
 so whatever happened while it was down is healed.\
 It logs one JSON line per event to stdout, with codes, names and numbers only.\
 On `SIGTERM` or `SIGINT` it stops taking webhooks, finishes the job in hand and exits.
@@ -156,6 +158,9 @@ an organization that wants pulls without credentials makes it public in the pack
 
 These are starting figures for one organization; adjust them to what the first weeks use.\
 Both probes can use `GET /healthz` on port 8080.\
+It answers only once the server has reached PostgreSQL and migrated,\
+so give it a startup probe of about three minutes, such as `periodSeconds: 5` with `failureThreshold: 36`;\
+otherwise a liveness probe can restart the server while it waits.\
 Run one replica: the queue is safe with more, but every replica would also run the scheduler.\
 Webhooks that arrive while the server is down are not redelivered by GitHub;\
 the rebuild that runs at every start, and the scheduled one, align every chart again.

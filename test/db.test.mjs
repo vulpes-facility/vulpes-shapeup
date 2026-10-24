@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createPool, migrate, migrations } from '../src/db.mjs';
+import pg from 'pg';
+import { createPool, migrate, migrations, startWaitMs, waitForDatabase } from '../src/db.mjs';
 import { Deliveries, Queue, priorities } from '../src/queue.mjs';
 import { Registry } from '../src/registry.mjs';
 
@@ -30,6 +31,49 @@ test('the password may come apart from the connection string', { skip }, async (
     assert.equal((await apart.query('SELECT 1 AS one')).rows[0].one, 1);
   } finally {
     await apart.end();
+  }
+});
+
+// A pool whose connect fails with each error in turn and then succeeds, and a clock that only sleeping moves.
+function waiting(errors) {
+  const clock = { now: 0, slept: [], log: [] };
+  const pool = { async connect() { if (errors.length) throw errors.shift(); return { release() {} }; } };
+  const options = { log: entry => clock.log.push(entry), sleep: async ms => { clock.slept.push(ms); clock.now += ms; }, now: () => clock.now };
+  return { pool, options, clock };
+}
+const networkError = code => Object.assign(new Error(`connect ${code}`), { code });
+const databaseError = code => Object.assign(new pg.DatabaseError('refused', 0, 'error'), { code });
+
+test('the server waits for a PostgreSQL that is still starting, longer after each failure', async () => {
+  const { pool, options, clock } = waiting([networkError('ENOTFOUND'), networkError('ECONNREFUSED'), databaseError('57P03')]);
+  assert.equal(await waitForDatabase(pool, options), 4);
+  assert.deepEqual(clock.slept, [1_000, 2_000, 4_000]);
+  assert.deepEqual(clock.log.map(entry => [entry.event, entry.code, entry.attempt]), [['database', 'ENOTFOUND', 1], ['database', 'ECONNREFUSED', 2], ['database', '57P03', 3]]);
+});
+
+test('the server stops waiting for PostgreSQL after startWaitMs and fails with the last error', async () => {
+  const last = networkError('ECONNREFUSED');
+  const { pool, options, clock } = waiting([]);
+  pool.connect = async () => { throw last; };
+  await assert.rejects(waitForDatabase(pool, options), error => error === last);
+  assert.equal(clock.slept.reduce((sum, ms) => sum + ms, 0), startWaitMs);
+  assert.deepEqual(clock.slept.slice(0, 5), [1_000, 2_000, 4_000, 8_000, 15_000]);
+});
+
+test('an error that PostgreSQL returns, such as a wrong password, ends the wait at once', async () => {
+  const { pool, options, clock } = waiting([databaseError('28P01')]);
+  await assert.rejects(waitForDatabase(pool, options), { code: '28P01' });
+  assert.deepEqual(clock.slept, []);
+});
+
+test('a real PostgreSQL that refuses the password ends the wait at once', { skip }, async () => {
+  const parts = new URL(url);
+  parts.password = 'not-the-password';
+  const wrong = createPool(parts.toString());
+  try {
+    await assert.rejects(waitForDatabase(wrong, { sleep: async () => assert.fail('it should not wait') }), { code: '28P01' });
+  } finally {
+    await wrong.end();
   }
 });
 

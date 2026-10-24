@@ -55,7 +55,31 @@ export function createPool(databaseUrl, password = null) {
     url.password = encodeURIComponent(password);
     connectionString = url.toString();
   }
-  return new pg.Pool({ connectionString, max: 5 });
+  // A connection that is not up in ten seconds fails, rather than waiting on the operating system's timeout.
+  return new pg.Pool({ connectionString, max: 5, connectionTimeoutMillis: 10_000 });
+}
+
+// The longest the server waits at start for PostgreSQL, which may still be starting beside it.
+export const startWaitMs = 120_000;
+
+// Connects until PostgreSQL takes a connection, waiting longer after each failure.
+// The wait ends at the first failure whose next sleep would pass startWaitMs, so with the last connection's timeout it can run ten seconds over.
+// An error that PostgreSQL itself returns, such as a wrong password or a missing database, ends the wait at once,
+// except the 57P states, which PostgreSQL returns while it starts up or shuts down.
+export async function waitForDatabase(pool, { log = () => {}, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = Date.now } = {}) {
+  const started = now();
+  for (let attempt = 1; ; attempt++) {
+    try {
+      (await pool.connect()).release();
+      return attempt;
+    } catch (error) {
+      const delay = Math.min(1_000 * 2 ** (attempt - 1), 15_000);
+      const refused = error instanceof pg.DatabaseError && !error.code?.startsWith('57P');
+      if (refused || now() - started + delay > startWaitMs) throw error;
+      log({ level: 'warn', event: 'database', code: error?.code ?? 'unexpected', attempt, retryInMs: delay });
+      await sleep(delay);
+    }
+  }
 }
 
 // A transaction-scoped advisory lock lets one server migrate while another waits for it.

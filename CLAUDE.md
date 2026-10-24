@@ -39,7 +39,7 @@ The server runs against GitHub from 0.2.0 on, and the admin API is not built.
 - `src/http.mjs` - The HTTP server: `POST /webhook` with a body limit and `GET /healthz`; it logs no body, header value or token.
 - `src/webhook.mjs` - The signature check and `WebhookHandler`, which turns issue, comment, board and installation events into jobs and registry changes.
 - `src/project-items.mjs` - Finds the issue and repository behind a `projects_v2_item` event through GraphQL.
-- `src/db.mjs` - The PostgreSQL pool and the migrations: installations, repositories, jobs and deliveries.
+- `src/db.mjs` - The PostgreSQL pool, the wait for PostgreSQL at start, and the migrations: installations, repositories, jobs and deliveries.
 - `src/queue.mjs` - `Queue`, which coalesces, prioritizes and claims jobs one repository at a time, and `Deliveries`, which drops repeated webhooks.
 - `src/registry.mjs` - `Registry`, the installations and repositories the App reaches and each repository's last result.
 - `src/service.mjs` - `HillService`, which aligns the hill chart of a pitch with its scopes' positions.
