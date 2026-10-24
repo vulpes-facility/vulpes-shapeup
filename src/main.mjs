@@ -1,7 +1,7 @@
 import { once } from 'node:events';
 import { ShapeUpError } from 'gh-vulpes-shapeup/domain';
 import { AppAuth } from './app-auth.mjs';
-import { createPool, migrate } from './db.mjs';
+import { createPool, migrate, waitForDatabase } from './db.mjs';
 import { httpServer } from './http.mjs';
 import { resolveIssue } from './project-items.mjs';
 import { Deliveries, Queue } from './queue.mjs';
@@ -22,7 +22,13 @@ export const jsonLog = entry => console.log(JSON.stringify({ time: new Date().to
 export async function start(env = process.env, { log = jsonLog, fetchImpl = fetch } = {}) {
   const settings = await loadSettings(env);
   const pool = createPool(settings.databaseUrl, settings.databasePassword);
-  await migrate(pool);
+  try {
+    await waitForDatabase(pool, { log });
+    await migrate(pool);
+  } catch (error) {
+    await pool.end();
+    throw error;
+  }
   const queue = new Queue(pool);
   const registry = new Registry(pool);
   const deliveries = new Deliveries(pool);
