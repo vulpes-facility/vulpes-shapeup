@@ -128,11 +128,14 @@ export class HillService {
     return drawn;
   }
   // since filters on the last update, which closing sets, so it only narrows the pages; closed_at decides.
+  // The open pitches are listed last, so a pitch reopened in between is aligned once, from its newer, open copy.
   async pitchesToAlign(cutoff) {
     const since = new Date(cutoff).toISOString();
     const closed = await this.api.pages(`/issues?state=closed&labels=${encodeURIComponent(this.config.pitchLabel)}&since=${since}`);
-    return [...await this.api.openPitches(this.config),
-      ...closed.filter(issue => !issue.pull_request && issue.closed_at && Date.parse(issue.closed_at) >= cutoff)];
+    const open = await this.api.openPitches(this.config);
+    const listed = new Set(open.map(pitch => pitch.number));
+    return [...open, ...closed.filter(issue => !issue.pull_request && !listed.has(issue.number) &&
+      issue.closed_at && Date.parse(issue.closed_at) >= cutoff)];
   }
   // Draws every open pitch that has scopes, or one given pitch, whether or not it matches the board.
   async rebuild(input) {

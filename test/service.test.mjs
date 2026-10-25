@@ -39,7 +39,7 @@ function fixture() {
     async children(number) { return relations[number]?.map(n => issues.get(n)) ?? []; },
     async positions(numbers) { return new Map(numbers.map(n => [n, values.get(n) ?? null])); },
     async openPitches() { return open.map(n => issues.get(n)); },
-    async pages(path) { paths.push(path); return closed.map(n => issues.get(n)); },
+    async pages(path) { paths.push(path); return closed.map(n => typeof n === 'number' ? issues.get(n) : n); },
     async updateBody(number, body) { bodies.push({ number, body }); issues.get(number).body = body; },
   };
   const service = new HillService(api, store, config);
@@ -199,17 +199,25 @@ test('aligning every pitch also aligns the pitches closed within the window, and
   const now = Date.parse('2026-10-25T00:00:00Z');
   const closedAt = ms => new Date(now - ms).toISOString();
   f.issues.set(50, issue(50, 'pitch', { state: 'closed', closed_at: closedAt(24 * 60 * 60 * 1000) }));
+  f.issues.set(55, issue(55, 'pitch', { state: 'closed', closed_at: closedAt(closedPitchMs) }));
   f.issues.set(60, issue(60, 'pitch', { state: 'closed', closed_at: closedAt(closedPitchMs + 1) }));
   f.issues.set(70, issue(70, 'pitch', { state: 'closed', closed_at: closedAt(0), pull_request: {} }));
-  for (const [pitch, scope] of [[50, 51], [60, 61], [70, 71]]) {
+  for (const [pitch, scope] of [[50, 51], [55, 56], [60, 61], [70, 71]]) {
     f.issues.set(scope, issue(scope, 'scope', { state: 'closed', state_reason: 'completed' }));
     f.values.set(scope, 100);
     f.relations[pitch] = [scope];
   }
-  f.closed.push(50, 60, 70);
-  assert.equal(await f.service.alignAll({ now: () => now }), 2);
-  assert.deepEqual(f.bodies.map(b => b.number), [10, 50]);
+  f.closed.push(50, 55, 60, 70);
+  assert.equal(await f.service.alignAll({ now: () => now }), 3);
+  assert.deepEqual(f.bodies.map(b => b.number), [10, 50, 55]);
   assert.deepEqual(f.paths, ['/issues?state=closed&labels=pitch&since=2026-10-18T00:00:00.000Z']);
+});
+test('a pitch reopened while the rebuild lists the pitches is aligned once, from its open copy', async () => {
+  const f = fixture();
+  f.closed.push({ ...f.issues.get(10), state: 'closed', closed_at: new Date().toISOString(), body: 'An older body' });
+  assert.equal(await f.service.alignAll(), 1);
+  assert.deepEqual(f.bodies.map(b => b.number), [10]);
+  assert.match(f.issues.get(10).body, /## Problem\n\nBody$/);
 });
 test('manual rebuild draws open pitches that have scopes, or one given pitch', async () => {
   const f = fixture();
