@@ -31,8 +31,10 @@ nobody hosts it for other organizations.
   only when the board no longer matches what the body last showed.
 - **Heals what it missed.**\
   GitHub does not redeliver a failed webhook,\
-  so a scheduled rebuild aligns every open pitch of every installed repository,\
-  and the server runs one when it starts.
+  so a scheduled rebuild aligns every open pitch of every installed repository\
+  and every pitch closed in the last seven days,\
+  and the server runs one when it starts.\
+  A change it missed on a pitch closed before that stays undrawn until another event on one of its scopes.
 - **Follows the installations.**\
   Installing the App or adding a repository to it queues that repository;\
   a repository without `.github/shapeup.json` on its default branch is skipped.
@@ -163,7 +165,8 @@ so give it a startup probe of about three minutes, such as `periodSeconds: 5` wi
 otherwise a liveness probe can restart the server while it waits.\
 Run one replica: the queue is safe with more, but every replica would also run the scheduler.\
 Webhooks that arrive while the server is down are not redelivered by GitHub;\
-the rebuild that runs at every start, and the scheduled one, align every chart again.
+the rebuild that runs at every start, and the scheduled one,\
+align again the charts of open pitches and of pitches closed in the last seven days.
 
 ## Releases
 
