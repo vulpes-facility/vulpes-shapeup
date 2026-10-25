@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { HillService } from '../src/service.mjs';
+import { HillService, closedPitchMs } from '../src/service.mjs';
 import { ShapeUpError, drawnValues } from 'gh-vulpes-shapeup/domain';
 import { parseConfig } from 'gh-vulpes-shapeup/config';
 
@@ -18,7 +18,8 @@ function fixture() {
     [20, issue(20, 'pitch', { body: '', sub_issues_summary: { total: 0 } })],
     [40, issue(40, 'pitch', { body: '', sub_issues_summary: { total: 1 } })], [41, issue(41, 'scope')]]);
   const values = new Map([[11, 20], [12, null], [13, 70], [41, 10]]);
-  const open = [10, 20];
+  const open = [10, 20], closed = [], paths = [];
+  const relations = { 10: [11, 12, 13], 40: [41] };
   const writes = [], bodies = [];
   const store = {
     files: new Map(), sha: null, loads: 0,
@@ -35,15 +36,16 @@ function fixture() {
     async requireField() { this.fieldChecks++; },
     async issue(number) { return issues.get(number); },
     async parent(number) { return [11, 12, 13].includes(number) ? issues.get(10) : number === 41 ? issues.get(40) : null; },
-    async children(number) { return ({ 10: [11, 12, 13], 40: [41] })[number]?.map(n => issues.get(n)) ?? []; },
+    async children(number) { return relations[number]?.map(n => issues.get(n)) ?? []; },
     async positions(numbers) { return new Map(numbers.map(n => [n, values.get(n) ?? null])); },
     async openPitches() { return open.map(n => issues.get(n)); },
+    async pages(path) { paths.push(path); return closed.map(n => typeof n === 'number' ? issues.get(n) : n); },
     async updateBody(number, body) { bodies.push({ number, body }); issues.get(number).body = body; },
   };
   const service = new HillService(api, store, config);
   const comment = (number = 12, extra = {}) => ({ action: 'created', issue: issues.get(number),
     comment: { id: 1, body: 'The unknowns are solved, so this moves over the top.', user: { login: 'owner', type: 'User' } }, ...extra });
-  return { service, api, store, issues, values, open, writes, bodies, comment };
+  return { service, api, store, issues, values, open, closed, paths, relations, writes, bodies, comment };
 }
 
 test('first comment draws every open scope, counting an empty value as 0 and skipping not-planned scopes', async () => {
@@ -179,7 +181,7 @@ test('redraw aligns only the pitch it is given, by its number or by one of its s
   assert.equal(await f.service.redraw(30, 'scope'), 'no-pitch');
   await assert.rejects(f.service.redraw(11, 'pitch'), { code: 'type' });
 });
-test('aligning every pitch draws only the open ones with scopes that the board no longer matches', async () => {
+test('aligning every pitch draws only the ones with scopes that the board no longer matches', async () => {
   const f = fixture();
   assert.equal(await f.service.alignAll(), 1);
   assert.deepEqual(f.bodies.map(b => b.number), [10]);
@@ -191,6 +193,31 @@ test('aligning every pitch draws only the open ones with scopes that the board n
   f.open.push(40);
   f.issues.get(40).labels = [{ name: 'scope' }];
   await assert.rejects(f.service.alignAll(), { code: 'rebuild', message: 'Some pitches were not aligned: #40 (type).' });
+});
+test('aligning every pitch also aligns the pitches closed within the window, and not those closed before it', async () => {
+  const f = fixture();
+  const now = Date.parse('2026-10-25T00:00:00Z');
+  const closedAt = ms => new Date(now - ms).toISOString();
+  f.issues.set(50, issue(50, 'pitch', { state: 'closed', closed_at: closedAt(24 * 60 * 60 * 1000) }));
+  f.issues.set(55, issue(55, 'pitch', { state: 'closed', closed_at: closedAt(closedPitchMs) }));
+  f.issues.set(60, issue(60, 'pitch', { state: 'closed', closed_at: closedAt(closedPitchMs + 1) }));
+  f.issues.set(70, issue(70, 'pitch', { state: 'closed', closed_at: closedAt(0), pull_request: {} }));
+  for (const [pitch, scope] of [[50, 51], [55, 56], [60, 61], [70, 71]]) {
+    f.issues.set(scope, issue(scope, 'scope', { state: 'closed', state_reason: 'completed' }));
+    f.values.set(scope, 100);
+    f.relations[pitch] = [scope];
+  }
+  f.closed.push(50, 55, 60, 70);
+  assert.equal(await f.service.alignAll({ now: () => now }), 3);
+  assert.deepEqual(f.bodies.map(b => b.number), [10, 50, 55]);
+  assert.deepEqual(f.paths, ['/issues?state=closed&labels=pitch&since=2026-10-18T00:00:00.000Z']);
+});
+test('a pitch reopened while the rebuild lists the pitches is aligned once, from its open copy', async () => {
+  const f = fixture();
+  f.closed.push({ ...f.issues.get(10), state: 'closed', closed_at: new Date().toISOString(), body: 'An older body' });
+  assert.equal(await f.service.alignAll(), 1);
+  assert.deepEqual(f.bodies.map(b => b.number), [10]);
+  assert.match(f.issues.get(10).body, /## Problem\n\nBody$/);
 });
 test('manual rebuild draws open pitches that have scopes, or one given pitch', async () => {
   const f = fixture();

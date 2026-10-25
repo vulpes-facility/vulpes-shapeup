@@ -1,6 +1,10 @@
 import { ShapeUpError, drawnValues, hillBlock, positionOf, sameValues, withHill } from 'gh-vulpes-shapeup/domain';
 import { chartUrl, renderHill, requireType } from './render.mjs';
 
+// GitHub does not send a failed webhook again, so the rebuild makes up for it on open pitches and on pitches closed
+// in the last seven days: a scope change missed just before its pitch closed is still drawn.
+export const closedPitchMs = 7 * 24 * 60 * 60 * 1000;
+
 export class HillService {
   constructor(api, store, config, renderer = renderHill) {
     this.api = api;
@@ -105,13 +109,13 @@ export class HillService {
     await this.draw(pitch, scopes);
     return true;
   }
-  // Aligns every open pitch that has scopes, drawing only those the board no longer matches,
-  // so a scheduled run over many repositories commits nothing when nothing moved.
-  async alignAll() {
+  // Aligns every open pitch that has scopes, and every pitch closed within closedPitchMs, drawing only those
+  // the board no longer matches, so a scheduled run over many repositories commits nothing when nothing moved.
+  async alignAll({ now = Date.now } = {}) {
     await this.initialize();
     const failures = [];
     let drawn = 0;
-    for (const pitch of await this.api.openPitches(this.config)) {
+    for (const pitch of await this.pitchesToAlign(now() - closedPitchMs)) {
       try {
         requireType(pitch, 'pitch', this.config);
         const scopes = await this.scopes(pitch);
@@ -122,6 +126,16 @@ export class HillService {
     }
     if (failures.length) throw new ShapeUpError('rebuild', `Some pitches were not aligned: ${failures.map(f => `#${f.number} (${f.code})`).join(', ')}.`);
     return drawn;
+  }
+  // since filters on the last update, which closing sets, so it only narrows the pages; closed_at decides.
+  // The open pitches are listed last, so a pitch reopened in between is aligned once, from its newer, open copy.
+  async pitchesToAlign(cutoff) {
+    const since = new Date(cutoff).toISOString();
+    const closed = await this.api.pages(`/issues?state=closed&labels=${encodeURIComponent(this.config.pitchLabel)}&since=${since}`);
+    const open = await this.api.openPitches(this.config);
+    const listed = new Set(open.map(pitch => pitch.number));
+    return [...open, ...closed.filter(issue => !issue.pull_request && !listed.has(issue.number) &&
+      issue.closed_at && Date.parse(issue.closed_at) >= cutoff)];
   }
   // Draws every open pitch that has scopes, or one given pitch, whether or not it matches the board.
   async rebuild(input) {
